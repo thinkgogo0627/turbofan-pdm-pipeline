@@ -1,0 +1,30 @@
+# .gitignore
+
+# 1. Python & Build
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.venv/
+.env
+
+# 2. Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# 3. Data (데이터는 절대 커밋하지 않음!)
+data/raw/*
+data/processed/*
+data/outputs/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/outputs/.gitkeep
+
+# 4. IDE settings (VSCode 등)
+.vscode/
+.idea/
+
+# 5. OS logs
+*.log
+.DS_Store
