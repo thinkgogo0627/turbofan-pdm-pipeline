@@ -1,0 +1,22 @@
+# Data Processing
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+
+# Modeling
+torch
+torchvision
+
+# MLOps & Tracking
+mlflow>=2.0.0
+
+# Serving (나중에 쓸 것)
+fastapi
+uvicorn
+python-multipart
+
+# Utilities
+pyyaml
+joblib
