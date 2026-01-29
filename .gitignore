@@ -14,12 +14,12 @@ venv/
 .ipynb_checkpoints
 
 # 3. Data (데이터는 절대 커밋하지 않음!)
-data/raw/*
-data/processed/*
-data/outputs/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/outputs/.gitkeep
+# data/raw/*
+# data/processed/*
+# data/outputs/*
+#!data/raw/.gitkeep
+#!data/processed/.gitkeep
+#!data/outputs/.gitkeep
 
 # 4. IDE settings (VSCode 등)
 .vscode/
