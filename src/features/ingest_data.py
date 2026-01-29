@@ -1,54 +1,57 @@
+import kagglehub
+import shutil
 import os
-import urllib.request
 from pathlib import Path
 
-# 프로젝트 루트 및 데이터 저장 경로
+# ==========================================
+# 설정 (Path Config)
+# ==========================================
 PROJECT_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = PROJECT_DIR / "data" / "raw"
+RAW_DATA_DIR = PROJECT_DIR / "data" / "raw"
 
-# 절대 터지지 않는 GitHub Raw 파일 경로 (가장 안정적인 미러)
-BASE_URL = "https://raw.githubusercontent.com/ankurchourasia/CMAPSSData/master/"
+# Kaggle Dataset ID (가장 안정적인 버전)
+DATASET_HANDLE = "behrad3d/nasa-cmaps"
 
-# 우리가 필요한 파일 리스트 (이 파일들이 있어야 분석 가능)
-FILES_TO_DOWNLOAD = [
-    "train_FD001.txt", "test_FD001.txt", "RUL_FD001.txt",
-    "train_FD002.txt", "test_FD002.txt", "RUL_FD002.txt",
-    "train_FD003.txt", "test_FD003.txt", "RUL_FD003.txt",
-    "train_FD004.txt", "test_FD004.txt", "RUL_FD004.txt",
-    "readme.txt"
-]
+def ingest_data():
+    print(f"[Start] Ingesting data via KaggleHub...")
 
-def download_data():
-    # 1. 저장할 폴더 생성
-    if not DATA_DIR.exists():
-        os.makedirs(DATA_DIR)
-        print(f"[Info] Created directory: {DATA_DIR}")
+    # 1. KaggleHub로 다운로드 (자동으로 ~/.cache/kagglehub 에 저장됨)
+    print(f" - Downloading dataset: {DATASET_HANDLE}")
+    try:
+        cache_path = kagglehub.dataset_download(DATASET_HANDLE)
+        print(f" - Downloaded to cache: {cache_path}")
+    except Exception as e:
+        print(f"[Error] KaggleHub download failed: {e}")
+        return
 
-    print(f"[Start] Downloading files to {DATA_DIR}...")
+    # 2. 우리 프로젝트 폴더(data/raw) 생성
+    if not RAW_DATA_DIR.exists():
+        os.makedirs(RAW_DATA_DIR)
+        print(f" - Created directory: {RAW_DATA_DIR}")
+
+    # 3. 캐시 폴더에서 파일 찾아서 복사해오기 (Move files)
+    print(" - Copying files to local data/raw directory...")
     
-    # 2. 파일 하나씩 순회하며 다운로드
-    for filename in FILES_TO_DOWNLOAD:
-        file_path = DATA_DIR / filename
-        file_url = BASE_URL + filename
-        
-        if not file_path.exists():
-            try:
-                print(f" - Downloading {filename}...", end=" ")
-                urllib.request.urlretrieve(file_url, file_path)
-                print("Done.")
-            except Exception as e:
-                print(f"\n[Error] Failed to download {filename}: {e}")
-        else:
-            print(f" - {filename} already exists. Skipping.")
+    file_count = 0
+    # 캐시 폴더를 뒤져서 .txt 파일만 가져옴
+    for root, dirs, files in os.walk(cache_path):
+        for file in files:
+            if file.endswith(".txt") or file.endswith(".csv"):
+                src_file = os.path.join(root, file)
+                dst_file = RAW_DATA_DIR / file
+                
+                # 복사 (이미 있으면 덮어쓰기)
+                shutil.copy2(src_file, dst_file)
+                print(f"   > Copied: {file}")
+                file_count += 1
 
-    # 3. 결과 확인
     print("-" * 30)
-    print("Download Complete. File list:")
-    files = sorted(os.listdir(DATA_DIR))
-    for f in files:
-        print(f" > {f}")
-    print(f"Total files: {len(files)}")
+    if file_count > 0:
+        print(f"[Done] Successfully ingested {file_count} files to {RAW_DATA_DIR}")
+        print("Ready for Feature Engineering!")
+    else:
+        print("[Warning] No files found in the downloaded dataset.")
     print("-" * 30)
 
 if __name__ == "__main__":
-    download_data()
+    ingest_data()

@@ -2,8 +2,10 @@
 pandas
 numpy
 scikit-learn
-matplotlib
-seaborn
+pyarrow
+
+# Data Validation
+pandera
 
 # Modeling
 torch
@@ -11,6 +13,7 @@ torchvision
 
 # MLOps & Tracking
 mlflow>=2.0.0
+dvc
 
 # Serving (나중에 쓸 것)
 fastapi
@@ -20,3 +23,5 @@ python-multipart
 # Utilities
 pyyaml
 joblib
+matplotlib
+seaborn
