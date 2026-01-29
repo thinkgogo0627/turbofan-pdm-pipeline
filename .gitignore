@@ -28,3 +28,4 @@ venv/
 # 5. OS logs
 *.log
 .DS_Store
+data/raw/
