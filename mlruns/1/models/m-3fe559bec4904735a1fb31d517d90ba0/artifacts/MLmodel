@@ -1,0 +1,23 @@
+artifact_path: /home/hojin/turbofan-pdm-pipeline/mlruns/1/models/m-3fe559bec4904735a1fb31d517d90ba0/artifacts
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.13.5
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.10.0+cu128
+mlflow_version: 3.8.1
+model_id: m-3fe559bec4904735a1fb31d517d90ba0
+model_size_bytes: 10149
+model_uuid: m-3fe559bec4904735a1fb31d517d90ba0
+prompts: null
+run_id: bf10c00296ea4bd9ba8fe510dc4bb1cb
+utc_time_created: '2026-02-02 13:55:51.007418'

@@ -47,11 +47,13 @@ def create_variations(df, sensor_col, span):
     )
     
     # 2. Variation A: Diff (변화 속도)
+    # EMA가 1초전보다 얼마나 변했는가?
     df[f"{sensor_col}_diff"] = df.groupby('unit_nr')[ema_col].transform(
         lambda x: x.diff().fillna(0)
     )
     
     # 3. Variation B: Std (최근 흔들림 정도)
+    # 최근 7초간 진동폭이 얼마나 컸는가?
     df[f"{sensor_col}_std"] = df.groupby('unit_nr')[sensor_col].transform(
         lambda x: x.rolling(window=span, min_periods=1).std().fillna(0)
     )

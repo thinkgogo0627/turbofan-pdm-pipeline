@@ -29,3 +29,4 @@ venv/
 *.log
 .DS_Store
 data/raw/
+data/raw/
