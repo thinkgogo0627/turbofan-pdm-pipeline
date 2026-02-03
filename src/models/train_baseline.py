@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import mlflow
 import mlflow.data
 from mlflow.data.pandas_dataset import PandasDataset
@@ -17,52 +18,22 @@ from sklearn.preprocessing import MinMaxScaler
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(PROJECT_DIR))
 
-from src.features.schema import FeatureSchema # 방금 만든 스키마
-from src.models.model_zoo import DeepCNN, CNNAttention, TransformerModel, DLinear
-
+from src.features.schema import FeatureSchema
+from src.models.model_zoo import DeepCNN, CNNAttention, TransformerModel, DLinear, Simple1DCNN
+from src.models.model_config import TRAINER_CONFIG, MODEL_CONFIGS # <--- Config 가져오기
 
 # ==========================================
 # 1. Config & Hyperparameters
 # ==========================================
-params = {
-    "window_size": 30,    # 과거 30초를 봄
-    "batch_size": 64,
-    "learning_rate": 0.001,
-    "epochs": 10,
-    "features": [
-        'sensor_2_ema', 'sensor_3_ema', 'sensor_4_ema', 'sensor_7_ema',
-        'sensor_11_ema', 'sensor_12_ema', 'sensor_15_ema' 
-        # (Variation 컬럼들도 추가 가능)
-    ]
-}
-
-# ==========================================
-# 2. Model Architecture (Simple 1D CNN)
-# ==========================================
-class Simple1DCNN(nn.Module):
-    def __init__(self, input_dim):
-        super(Simple1DCNN, self).__init__()
-        # Conv1d: 시계열의 '지역적 패턴'을 찾음 (필터가 시간축으로 슬라이딩)
-        self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3)
-        self.relu = nn.ReLU()
-        self.pool = nn.MaxPool1d(kernel_size=2)
-        self.flatten = nn.Flatten()
-        
-        # Flatten 후의 차원 계산이 귀찮으므로 AdaptiveAvgPool 사용 (꼼수)
-        # 어떤 길이든 1개의 값으로 압축
-        self.global_pool = nn.AdaptiveAvgPool1d(1) 
-        self.fc = nn.Linear(32, 1) # RUL 예측 (Regression)
-
-    def forward(self, x):
-        # x shape: (Batch, Time, Features) -> (Batch, Features, Time) 변환 필요
-        x = x.transpose(1, 2)
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.global_pool(x) # (Batch, 32, 1)
-        x = self.flatten(x)     # (Batch, 32)
-        x = self.fc(x)          # (Batch, 1)
-        return x
-
+def get_model(model_name, input_dim, model_conf):
+    """모델 이름과 설정값을 받아서 객체를 생성해주는 Factory 함수"""
+    if model_name == "DLinear":
+        return DLinear(seq_len=model_conf['window_size'], input_dim=input_dim)
+    elif model_name == "Transformer":
+        return TransformerModel(input_dim=input_dim, d_model=model_conf['d_model'], nhead=model_conf['nhead'])
+    elif model_name == "DeepCNN":
+        return DeepCNN(input_dim=input_dim, hidden_dim=model_conf['hidden_dim'])
+    
 # ==========================================
 # 3. Data Preparation (Sliding Window)
 # ==========================================
@@ -87,92 +58,56 @@ def create_dataset(df, window_size, feature_cols):
 # ==========================================
 # 4. Main Training Pipeline
 # ==========================================
-def train(model_type):
-
-    # 이름 생성
+def train_model(model_name):
+    # 1. 설정 로드 (공통 설정 + 모델 전용 설정 합체)
+    if model_name not in MODEL_CONFIGS:
+        raise ValueError(f"Unknown model: {model_name}")
+    
+    # 딕셔너리 병합 (Python 3.9+)
+    config = TRAINER_CONFIG | MODEL_CONFIGS[model_name]
+    
+    # MLflow 세팅
     current_time = datetime.now().strftime("%m%d_%H%M")
-    run_name = f"{model_type}_{current_time}"
-
-    # MLflow 실험 이름 설정
+    run_name = f"{model_name}_{current_time}"
     mlflow.set_experiment("Turbofan_RUL_Prediction")
 
-    
     with mlflow.start_run(run_name=run_name):
-        # A. 데이터 로드 및 검증 (Pandera)
-        print("[Step 1] Loading & Validating Data...")
+        print(f"🚀 Start Training: {model_name}")
+        print(f"📜 Applied Config: {config}")
+        mlflow.log_params(config) # 합쳐진 설정 기록
+
+        # ----------------------------------------
+        # 데이터 로드 & 전처리 (이전과 동일하지만 config 사용)
+        # ----------------------------------------
         data_path = PROJECT_DIR / "data/processed/train_FD001_features.parquet"
         df = pd.read_parquet(data_path)
-
-    
-        ## MLflow에 데이터셋 정보 등록
-        print("[Info] logging dataset info to mlflow")
-        # pandas dataframe -> mlflow dataset 객체 변환
-        dataset = mlflow.data.from_pandas(
-            df,
-            source=str(data_path),
-            name = "turbofan_processed_data_ver_1"
-        )
-        # train 용도로 사용했다고 기록
-        mlflow.log_input(dataset, context="training")
         
-        # Pandera 검증 수행 (실패하면 에러 발생)
-        try:
-            FeatureSchema.validate(df)
-            print("✅ Data Schema Validation Passed!")
-        except Exception as e:
-            print(f"❌ Data Validation Failed: {e}")
-            return
-
-        ### Pandera 데이터 무결성 검증 후 Scaling 수행
-        print("[Step 1.5] Applying MinMaxScaler")
-
-        # Feature 컬럼 , Target 컬럼 분리
-        feature_cols = params['features']
-
-        # 스케일러 정의
+        # Scaling
         scaler = MinMaxScaler()
+        df[config['features']] = scaler.fit_transform(df[config['features']])
+        
+        # Windowing (config['window_size'] 사용)
+        # (create_dataset 함수는 기존과 동일하다고 가정)
+        X, y = create_dataset(df, config['window_size'], config['features'])
+        
+        # DataLoader 생성
+        dataset = TensorDataset(torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32).unsqueeze(1))
+        dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
 
-        # 데이터프레임의 Feature 만 스케일링 -> Target은 스케일링 X
-        df[feature_cols] = scaler.fit_transform(df[feature_cols])
-
-
-        # B. 전처리 (Windowing)
-        print("[Step 2] Creating Sliding Windows...")
-        X, y = create_dataset(df, params['window_size'], params['features'])
+        # ----------------------------------------
+        # 모델 초기화 (Factory 함수 사용)
+        # ----------------------------------------
+        model = get_model(model_name, len(config['features']), MODEL_CONFIGS[model_name])
         
-        # Tensor 변환
-        X_tensor = torch.tensor(X, dtype=torch.float32)
-        y_tensor = torch.tensor(y, dtype=torch.float32).unsqueeze(1)
-        
-        dataset = TensorDataset(X_tensor, y_tensor)
-        dataloader = DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
-        
-        # C. 모델 초기화
-        if model_type == "DeepCNN":
-            model = DeepCNN(input_dim=len(params['features']))
-        
-        elif model_type == "CNNAttention":
-            model = CNNAttention(input_dim=len(params['features']))
-        
-        elif model_type == "Transformer":
-            model = TransformerModel(input_dim=len(params['features']))
-
-        elif model_type == "DLinear":
-            model = DLinear(seq_len=params['window_size'], input_dim=len(params['features']))
-        
-        else:
-            model = Simple1DCNN(input_dim=len(params['features'])) # Default
-
         criterion = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters(), lr=params['learning_rate'])
-        
-        # MLflow 파라미터 기록
-        mlflow.log_params(params)
-        
-        # D. 학습 루프
-        print("[Step 3] Training Start...")
+        optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+
+        # ----------------------------------------
+        # 학습 루프
+        # ----------------------------------------
         model.train()
-        for epoch in range(params['epochs']):
+        for epoch in range(config['epochs']):
             epoch_loss = 0
             for batch_X, batch_y in dataloader:
                 optimizer.zero_grad()
@@ -184,15 +119,20 @@ def train(model_type):
             
             avg_loss = epoch_loss / len(dataloader)
             rmse = np.sqrt(avg_loss)
-            print(f"Epoch {epoch+1}/{params['epochs']}, Loss: {avg_loss:.4f}, RMSE: {rmse:.4f}")
             
-            # MLflow 메트릭 기록
-            mlflow.log_metric("rmse", rmse, step=epoch)
+            # Scheduler Step
+            scheduler.step(avg_loss)
             
-        # E. 모델 저장
-        print("[Step 4] Saving Model...")
+            # Logging
+            if (epoch+1) % 10 == 0:
+                lr = optimizer.param_groups[0]['lr']
+                print(f"Epoch {epoch+1}/{config['epochs']} | RMSE: {rmse:.4f} | LR: {lr:.6f}")
+                mlflow.log_metric("rmse", rmse, step=epoch)
+
+        # 저장
         mlflow.pytorch.log_model(model, "model")
-        print("🎉 Training Complete! Check MLflow UI.")
+        print("🎉 Training Finished.")
+
 
 if __name__ == "__main__":
-    train(model_type="DLinear")
+    train_model(model_type="DLinear")
