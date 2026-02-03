@@ -1,4 +1,4 @@
-artifact_path: /home/hojin/turbofan-pdm-pipeline/mlruns/1/models/m-3fe559bec4904735a1fb31d517d90ba0/artifacts
+artifact_path: /home/hojin/turbofan-pdm-pipeline/mlruns/3/models/m-5d3824631e8046bb8da7e9ce623a5255/artifacts
 flavors:
   python_function:
     config:
@@ -15,9 +15,9 @@ flavors:
     model_data: data
     pytorch_version: 2.10.0+cu128
 mlflow_version: 3.8.1
-model_id: m-3fe559bec4904735a1fb31d517d90ba0
-model_size_bytes: 10149
-model_uuid: m-3fe559bec4904735a1fb31d517d90ba0
+model_id: m-5d3824631e8046bb8da7e9ce623a5255
+model_size_bytes: 3546082
+model_uuid: m-5d3824631e8046bb8da7e9ce623a5255
 prompts: null
-run_id: bf10c00296ea4bd9ba8fe510dc4bb1cb
-utc_time_created: '2026-02-02 13:55:51.007418'
+run_id: bbf01658c3e740db8a8fe95ca32073a9
+utc_time_created: '2026-02-03 12:56:19.077004'

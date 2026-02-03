@@ -1,6 +1,6 @@
 ## 데이터가 모델에 들어가기 전 '데이터에 결점이 없는 지' 검사하는 Schema 정의
 
-import pandera as pa
+import pandera.pandas as pa
 from pandera import Column, Check
 
 # Class 방식(SchemaModel)이 에러가 나므로,

@@ -5,15 +5,21 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import mlflow
+import mlflow.data
+from mlflow.data.pandas_dataset import PandasDataset
 import mlflow.pytorch
 from pathlib import Path
+from datetime import datetime
 import sys
+from sklearn.preprocessing import MinMaxScaler
 
 # 프로젝트 루트 경로 추가 (모듈 import용)
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(PROJECT_DIR))
 
 from src.features.schema import FeatureSchema # 방금 만든 스키마
+from src.models.model_zoo import DeepCNN, CNNAttention, TransformerModel, DLinear
+
 
 # ==========================================
 # 1. Config & Hyperparameters
@@ -81,15 +87,33 @@ def create_dataset(df, window_size, feature_cols):
 # ==========================================
 # 4. Main Training Pipeline
 # ==========================================
-def train():
+def train(model_type):
+
+    # 이름 생성
+    current_time = datetime.now().strftime("%m%d_%H%M")
+    run_name = f"{model_type}_{current_time}"
+
     # MLflow 실험 이름 설정
-    mlflow.set_experiment("Baseline_1D_CNN")
+    mlflow.set_experiment("Turbofan_RUL_Prediction")
+
     
-    with mlflow.start_run():
+    with mlflow.start_run(run_name=run_name):
         # A. 데이터 로드 및 검증 (Pandera)
         print("[Step 1] Loading & Validating Data...")
         data_path = PROJECT_DIR / "data/processed/train_FD001_features.parquet"
         df = pd.read_parquet(data_path)
+
+    
+        ## MLflow에 데이터셋 정보 등록
+        print("[Info] logging dataset info to mlflow")
+        # pandas dataframe -> mlflow dataset 객체 변환
+        dataset = mlflow.data.from_pandas(
+            df,
+            source=str(data_path),
+            name = "turbofan_processed_data_ver_1"
+        )
+        # train 용도로 사용했다고 기록
+        mlflow.log_input(dataset, context="training")
         
         # Pandera 검증 수행 (실패하면 에러 발생)
         try:
@@ -98,6 +122,19 @@ def train():
         except Exception as e:
             print(f"❌ Data Validation Failed: {e}")
             return
+
+        ### Pandera 데이터 무결성 검증 후 Scaling 수행
+        print("[Step 1.5] Applying MinMaxScaler")
+
+        # Feature 컬럼 , Target 컬럼 분리
+        feature_cols = params['features']
+
+        # 스케일러 정의
+        scaler = MinMaxScaler()
+
+        # 데이터프레임의 Feature 만 스케일링 -> Target은 스케일링 X
+        df[feature_cols] = scaler.fit_transform(df[feature_cols])
+
 
         # B. 전처리 (Windowing)
         print("[Step 2] Creating Sliding Windows...")
@@ -111,7 +148,21 @@ def train():
         dataloader = DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
         
         # C. 모델 초기화
-        model = Simple1DCNN(input_dim=len(params['features']))
+        if model_type == "DeepCNN":
+            model = DeepCNN(input_dim=len(params['features']))
+        
+        elif model_type == "CNNAttention":
+            model = CNNAttention(input_dim=len(params['features']))
+        
+        elif model_type == "Transformer":
+            model = TransformerModel(input_dim=len(params['features']))
+
+        elif model_type == "DLinear":
+            model = DLinear(seq_len=params['window_size'], input_dim=len(params['features']))
+        
+        else:
+            model = Simple1DCNN(input_dim=len(params['features'])) # Default
+
         criterion = nn.MSELoss()
         optimizer = optim.Adam(model.parameters(), lr=params['learning_rate'])
         
@@ -144,4 +195,4 @@ def train():
         print("🎉 Training Complete! Check MLflow UI.")
 
 if __name__ == "__main__":
-    train()
+    train(model_type="DLinear")
