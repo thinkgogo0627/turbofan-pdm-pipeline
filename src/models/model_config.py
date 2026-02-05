@@ -6,8 +6,12 @@ TRAINER_CONFIG = {
     "learning_rate": 0.005,
     "patience": 10,         # Early Stopping 용
     "features": [
-        'sensor_2_ema', 'sensor_3_ema', 'sensor_4_ema', 'sensor_7_ema',
-        'sensor_11_ema', 'sensor_12_ema', 'sensor_15_ema'
+        'sensor_2_sg', 'sensor_3_sg', 'sensor_4_sg', 'sensor_7_sg',
+        'sensor_11_sg', 'sensor_12_sg', 'sensor_15_sg',
+
+        # 새로 추가된 핵심 feature
+        'pca_1', # 종합 건강 지수
+        'pca_1_trend' # 건강 악화 속도
     ]
 }
 
@@ -23,9 +27,9 @@ MODEL_CONFIGS = {
     "DeepCNN": {
         "window_size": 30,
         # "3층의 layer 쌓기, 갈수록 뚱뚱해지게 제작"
-        "hidden_layers": [64, 128, 256],
+        "hidden_layers": [64, 128, 256, 256],
         "kernel_size": 7, # 커널 크기 결정
-        "dropout": 0.3
+        "dropout": 0.4
     },
 
     "Transformer": {
@@ -36,7 +40,7 @@ MODEL_CONFIGS = {
     },
     
     "DLinear": {
-        "window_size": 90, # DLinear는 긴 시계열을 잘 보므로 30 -> 60으로 늘림 (튜닝 포인트)
+        "window_size": 30, # DLinear는 긴 시계열을 잘 보므로 30 -> 60으로 늘림 (튜닝 포인트)
         "individual": False # 채널별로 가중치 따로 쓸지 여부
     }
 }

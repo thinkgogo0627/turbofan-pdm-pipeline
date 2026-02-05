@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import os
+from src.features.advanced_features import AdvancedFeatureEngineer
+
 
 # ==========================================
 # 1. 설정 및 경로 (Settings)
@@ -68,20 +70,26 @@ def process_pipeline():
     # 2. RUL Labeling
     df = calculate_rul(df)
     
-    # 3. Feature Engineering (Variations)
-    print(f"[Process] Applying EMA(span={EMA_SPAN}) and Creating Variations...")
-    for sensor in IMPORTANT_SENSORS:
-        df = create_variations(df, sensor, EMA_SPAN)
-        
-    # 4. Cleaning (불필요한 컬럼 제거 - 선택 사항)
-    # 일단은 Feature Store니까 원본 센서값도 남겨두고, 파생변수도 다 저장합니다.
-    # 나중에 학습할 때 골라 쓰면 됩니다.
+    # -------------------------------------------------------
+    # Advanced Feature Engineering
+    # -------------------------------------------------------
+    print('[Step 2] Engineering Acvanced Features')
+    engineer = AdvancedFeatureEngineer(IMPORTANT_SENSORS)
+
+    # 전략 1 -> S-G Filter
+    df  = engineer.apply_savgol(df)
+
+    # 전략 2 -> PCA Health Indexer (센서 융합)
+    df  = engineer.apply_pca_fusion(df)
+
+    # 전략 3 -> Kurtosis 적용
+    df = engineer.apply_kurtosis(df)
     
     # 5. Save to Parquet
     if not PROCESSED_DIR.exists():
         os.makedirs(PROCESSED_DIR)
         
-    save_path = PROCESSED_DIR / "train_FD001_features.parquet"
+    save_path = PROCESSED_DIR / "train_FD001_advanced_features.parquet"
     
     # Parquet 저장 (압축 사용)
     df.to_parquet(save_path, index=False, engine='pyarrow', compression='snappy')
