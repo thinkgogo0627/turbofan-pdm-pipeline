@@ -3,51 +3,71 @@ import torch.nn as nn
 import math
 
 # ==========================================
-# 1. Deep CNN (ResNet Style)
+# 0. Simple 1D CNN (Baseline)
 # ==========================================
-class DeepCNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64):
-        super(DeepCNN, self).__init__()
-        # 1st Block
-        self.conv1 = nn.Conv1d(input_dim, hidden_dim, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
+class Simple1DCNN(nn.Module):
+    def __init__(self, input_dim):
+        super(Simple1DCNN, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3)
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.3)
+        # self.pool = nn.MaxPool1d(kernel_size=2) # AdaptiveAvgPool 쓰면 굳이 필요 없음
+        self.flatten = nn.Flatten()
         
-        # 2nd Block (Deep)
-        self.conv2 = nn.Conv1d(hidden_dim, hidden_dim * 2, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm1d(hidden_dim * 2)
-        
-        # 3rd Block
-        self.conv3 = nn.Conv1d(hidden_dim * 2, hidden_dim, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm1d(hidden_dim)
-        
-        # Global Pooling & Output
-        self.global_pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(hidden_dim, 1)
+        # 어떤 길이(Seq_Len)가 들어와도 1개로 압축 (Flatten 편하게 하기 위해)
+        self.global_pool = nn.AdaptiveAvgPool1d(1) 
+        self.fc = nn.Linear(32, 1)
 
     def forward(self, x):
         # x: (Batch, Seq, Feat) -> (Batch, Feat, Seq)
         x = x.transpose(1, 2)
-        
         x = self.conv1(x)
-        x = self.bn1(x)
         x = self.relu(x)
-        x = self.dropout(x)
-        
-        # Residual Connection 개념 적용 가능 (여기선 단순 Stacking)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu(x)
-        
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = self.relu(x)
+        x = self.global_pool(x) # (Batch, 32, 1)
+        x = self.flatten(x)     # (Batch, 32)
+        x = self.fc(x)          # (Batch, 1)
+        return x
+
+
+# ==========================================
+# 1. Deep CNN (ResNet Style)
+# ==========================================
+class DeepCNN(nn.Module):
+    def __init__(self, input_dim, hidden_layers, kernel_size= 3, dropout= 0.3):
+        super(DeepCNN, self).__init__()
+
+        self.layers = nn.ModuleList() # 여기에 레이어 한 층씩 담기
+
+        # 반복문 돌면서 층 쌓기
+        current_dim = input_dim
+
+        for h_dim in hidden_layers:
+            # 블록 하나 생성 (Conv -> BN -> ReLU -> Dropout)
+            block = nn.Sequential(
+                nn.Conv1d(current_dim, h_dim, kernel_size=kernel_size, padding=kernel_size//2),
+                nn.BatchNorm1d(h_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            )
+            self.layers.append(block) # 리스트에 추가
+            current_dim = h_dim # 다음 레이어의 입력은 현재 레이어의 출력이 됨
+
+        # 마지막 출력층
+        self.global_pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Linear(current_dim, 1) # 마지막 남은 채널 수 -> 1 (RUL)
+
+    def forward(self, x):
+        # x: (Batch, Seq, Feat) -> (Batch, Feat, Seq)
+        x = x.transpose(1, 2)
+
+        # ModuleList에 담긴 레이어들을 순서대로 통과
+        for layer in self.layers:
+            x = layer(x)
         
         x = self.global_pool(x).squeeze(-1)
         x = self.fc(x)
-        return x
 
+        return x
+        
 # ==========================================
 # 2. CNN + Attention (SE-Block Style)
 # ==========================================
