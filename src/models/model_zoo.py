@@ -72,42 +72,44 @@ class DeepCNN(nn.Module):
 # 2. CNN + Attention (SE-Block Style)
 # ==========================================
 class CNNAttention(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64):
+    def __init__(self, input_dim, hidden_dim=128, kernel_size=3, dropout=0.2):
         super(CNNAttention, self).__init__()
-        # Feature Extractor (CNN)
-        self.conv = nn.Conv1d(input_dim, hidden_dim, kernel_size=3, padding=1)
-        self.relu = nn.ReLU()
         
-        # Attention Mechanism
-        # "어떤 시점(Time Step)이 중요한가?"를 계산
+        # 1. Feature Extractor (CNN)
+        self.conv = nn.Conv1d(input_dim, hidden_dim, kernel_size=kernel_size, padding='same') # padding='same' 추천
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout) # [추가] 과적합 방지턱
+        
+        # 2. Attention Mechanism
         self.attention = nn.Sequential(
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(hidden_dim, hidden_dim), # [수정] 표현력 증대
             nn.Tanh(),
-            nn.Softmax(dim=1) # 시간축(seq_len)에 대해 확률 계산
+            nn.Linear(hidden_dim, 1), # [수정] 정석적인 Attention 구조 (Vector -> Scalar Score)
+            nn.Softmax(dim=1)
         )
         
         self.fc = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
-        # x: (Batch, Seq, Feat)
-        # 1. CNN Feature Extraction
-        x_t = x.transpose(1, 2)     # (B, Feat, Seq)
-        out = self.conv(x_t)        # (B, Hidden, Seq)
+        # x: (Batch, Seq, Feat) -> (Batch, Feat, Seq)
+        x = x.transpose(1, 2)
+        
+        # CNN
+        out = self.conv(x)
         out = self.relu(out)
-        out = out.transpose(1, 2)   # (B, Seq, Hidden) 다시 돌림
+        out = self.dropout(out) # Dropout 적용
         
-        # 2. Compute Attention Weights
-        # (B, Seq, Hidden) -> (B, Seq, 1) -> (B, Seq, 1) Softmax
-        attn_weights = self.attention(out)
+        # Attention을 위해 다시 (Batch, Seq, Hidden)으로 전환
+        out = out.transpose(1, 2)
         
-        # 3. Apply Attention (Weighted Sum)
-        # (B, Seq, Hidden) * (B, Seq, 1) -> Sum over Seq -> (B, Hidden)
-        context_vector = torch.sum(out * attn_weights, dim=1)
+        # Attention Weights 계산
+        weights = self.attention(out)
         
-        # 4. Prediction
-        prediction = self.fc(context_vector)
-        return prediction
-
+        # Context Vector (가중합)
+        context = torch.sum(out * weights, dim=1)
+        
+        # Prediction
+        return self.fc(context)
 # ==========================================
 # 3. Transformer (Encoder Only)
 # ==========================================

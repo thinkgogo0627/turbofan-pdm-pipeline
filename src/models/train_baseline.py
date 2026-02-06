@@ -25,7 +25,7 @@ from src.models.model_config import TRAINER_CONFIG, MODEL_CONFIGS
 
 # GPU 설정 (3060 Laptop 활용)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"💻 Using Device: {device}")
+print(f" Using Device: {device}")
 
 def get_model(model_name, input_dim, model_conf):
     """모델 Factory 함수"""
@@ -94,6 +94,10 @@ def train_model(model_name):
         data_path = PROJECT_DIR / "data/processed/train_FD001_advanced_features.parquet"
         df = pd.read_parquet(data_path)
 
+        # MLflow 데이터셋 정보 로깅
+        dataset = mlflow.data.from_pandas(df, source=str(data_path), name="turbofan_train_split")
+        mlflow.log_input(dataset, context="training")
+
         # RUL Clipping
         MAX_RUL = 125
         print(f" [Preprocessing] Clipping RUL to max {MAX_RUL}...")
@@ -140,7 +144,7 @@ def train_model(model_name):
         # Scheduler & Early Stopping 설정
         patience_lr = 5      # 학습률 감소를 위한 인내심
         patience_stop = 15   # 조기 종료를 위한 인내심 (이만큼 참았는데 안 좋아지면 종료)
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=patience_lr, verbose=True)
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=patience_lr)
         
         best_val_loss = float('inf')
         early_stop_counter = 0

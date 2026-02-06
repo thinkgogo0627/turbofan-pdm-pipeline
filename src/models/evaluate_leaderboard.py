@@ -14,6 +14,11 @@ import ast
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_DIR / "data"
 
+
+# [수정 1] GPU 디바이스 설정
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f" Evaluation Device: {device}")
+
 # ==========================================
 # 1. Feature Engineering Logic
 # ==========================================
@@ -127,13 +132,13 @@ def prepare_test_data_dynamic(window_size, feature_cols):
 # ==========================================
 # 3. 메인 평가 실행
 # ==========================================
-def evaluate_top_models(top_n=2):
+def evaluate_top_models(top_n=5):
     print(f"🔎 Searching for Top {top_n} models...")
     
     experiment = mlflow.get_experiment_by_name("Turbofan_RUL_Prediction")
     runs = mlflow.search_runs(
         experiment_ids=[experiment.experiment_id],
-        order_by=["metrics.rmse ASC"],
+        order_by=["metrics.val_rmse ASC"], # 검증 rmse 기준으로 오름차순 정렬
         max_results=top_n
     )
 
@@ -152,6 +157,9 @@ def evaluate_top_models(top_n=2):
         
         try:
             model = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
+            
+            # 모델을 GPU로 이동
+            model.to(device)
             model.eval()
         except:
             print("   ❌ Load Failed.")
@@ -161,12 +169,31 @@ def evaluate_top_models(top_n=2):
         
         if X_test is None:
             continue
+        
+        # 데이터를 GPU로 이동 및 Shape 맞추기
+        # X_test 원본: (Batch, Window, Feature)
+
+        ## CNN / CNNAttention: Conv1d 사용 -> (Batch, Feature, Time) -> Transpose 해야함
+        ## Transformer: Linear 레이어 -> (Batch, Time, Feature) -> Transpose 하면 안됨
+
+        X_test = X_test.to(device)
+        
+        if "CNN" in model_name:
+            # CNN 계열: (Batch, Feature, Window) 형태가 필요함 -> Transpose O
+            X_test = X_test.transpose(1, 2)
+        elif "Transformer" in model_name or "DLinear" in model_name:
+            # Transformer/DLinear: (Batch, Window, Feature) 형태 유지 -> Transpose X
+            pass 
+        else:
+            # 그 외(Simple1DCNN 등) 기본적으로 CNN 베이스라면 Transpose
+            X_test = X_test.transpose(1, 2)
 
         with torch.no_grad():
             y_pred = model(X_test)
         
-        y_pred_flat = y_pred.numpy().flatten()
+        y_pred_flat = y_pred.cpu().numpy().flatten()
         y_true_flat = y_true.numpy().flatten()
+
         test_rmse = np.sqrt(mean_squared_error(y_true_flat, y_pred_flat))
         
         print(f"   🏆 Test RMSE: {test_rmse:.4f} (Train RMSE: {run['metrics.train_rmse']:.4f})")
@@ -175,4 +202,4 @@ def evaluate_top_models(top_n=2):
             mlflow.log_metric("test_rmse", test_rmse)
 
 if __name__ == "__main__":
-    evaluate_top_models(top_n=1)
+    evaluate_top_models(top_n=10)

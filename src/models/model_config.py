@@ -33,11 +33,20 @@ MODEL_CONFIGS = {
     },
 
     "Transformer": {
-        "window_size": 60, # Transformer는 윈도우가 좀 더 길어도 됨
-        "d_model": 64,
-        "nhead": 4,
-        "num_layers": 2
+        "window_size": 75, # Transformer는 윈도우가 좀 더 길어도 됨
+        "d_model": 128, # 모델 용량
+        "nhead": 8, # 시야각(데이터를 쳐다보는 눈)
+        "num_layers": 3, # 레이어 갯수 -> 추론의 깊이
+        "dropout":0.2
     },
+
+    "CNNAttention": {
+        "window_size": 40,
+        "hidden_dim":128,
+        "kernel_size":3,
+        "dropout":0.3
+    },
+
     
     "DLinear": {
         "window_size": 50, # DLinear는 긴 시계열을 잘 보므로 30 -> 60으로 늘림 (튜닝 포인트)
