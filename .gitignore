@@ -30,3 +30,8 @@ venv/
 .DS_Store
 data/raw/
 data/raw/
+
+# 6. MLflow 실험 파일들
+mlruns/
+mlflow.db
+.trash/
