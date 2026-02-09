@@ -33,11 +33,11 @@ MODEL_CONFIGS = {
     },
 
     "Transformer": {
-        "window_size": 75, # Transformer는 윈도우가 좀 더 길어도 됨
-        "d_model": 128, # 모델 용량
+        "window_size": 60, # window size가 길수록 사이클을 더 길게 보게 됨
+        "d_model": 256, # 모델 용량
         "nhead": 8, # 시야각(데이터를 쳐다보는 눈)
-        "num_layers": 3, # 레이어 갯수 -> 추론의 깊이
-        "dropout":0.2
+        "num_layers": 4, # 레이어 갯수 -> 추론의 깊이
+        "dropout":0.3 # 모델 용량과 드롭아웃 비례하게 설정
     },
 
     "CNNAttention": {

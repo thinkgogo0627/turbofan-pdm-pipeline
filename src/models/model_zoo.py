@@ -132,7 +132,7 @@ class TransformerModel(nn.Module):
         self.embedding = nn.Linear(input_dim, d_model)
         self.pos_encoder = PositionalEncoding(d_model)
         
-        encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, batch_first=True)
+        encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, batch_first=True, activation='gelu')
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
         
         self.fc = nn.Linear(d_model, 1)
