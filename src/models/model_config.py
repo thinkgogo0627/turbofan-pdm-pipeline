@@ -1,5 +1,7 @@
 ## 개별 모델의 하이퍼파라미터 관리할 모델 하이퍼파라미터 레지스트리# 1. 공통 학습 설정 (Trainer Config)
 
+
+## 학습기(Trainer 의 설정)
 TRAINER_CONFIG = {
     "batch_size": 256,      # 튜닝 완료된 값
     "epochs": 100,          # 충분히 길게

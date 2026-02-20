@@ -1,0 +1,30 @@
+{
+    "models": [
+        {
+            "rank": 1,
+            "filename": "model_rank1_w70.pth",
+            "model_type": "Transformer",
+            "window_size": 70,
+            "test_rmse_mc_dropout": 13.843650800293569,
+            "run_id": "a469ff4cefaf48d096aed3588ab81f8c"
+        },
+        {
+            "rank": 2,
+            "filename": "model_rank2_w75.pth",
+            "model_type": "Transformer",
+            "window_size": 75,
+            "test_rmse_mc_dropout": 14.181516217304823,
+            "run_id": "a0ae5884467d4bd690ebd5d06da4c427"
+        },
+        {
+            "rank": 3,
+            "filename": "model_rank3_w60.pth",
+            "model_type": "Transformer",
+            "window_size": 60,
+            "test_rmse_mc_dropout": 14.329480089444594,
+            "run_id": "4f6aecf48c1c4f6e8968bbd6ed5e61a2"
+        }
+    ],
+    "ensemble_method": "average",
+    "expected_features": 9
+}
