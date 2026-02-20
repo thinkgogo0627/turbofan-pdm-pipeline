@@ -5,24 +5,39 @@
             "filename": "model_rank1_w70.pth",
             "model_type": "Transformer",
             "window_size": 70,
-            "test_rmse_mc_dropout": 13.843650800293569,
-            "run_id": "a469ff4cefaf48d096aed3588ab81f8c"
+            "val_rmse": 12.129278845269516,
+            "run_id": "a469ff4cefaf48d096aed3588ab81f8c",
+            "hyperparams": {
+                "d_model": 128,
+                "nhead": 8,
+                "num_layers": 3
+            }
         },
         {
             "rank": 2,
-            "filename": "model_rank2_w75.pth",
+            "filename": "model_rank2_w60.pth",
             "model_type": "Transformer",
-            "window_size": 75,
-            "test_rmse_mc_dropout": 14.181516217304823,
-            "run_id": "a0ae5884467d4bd690ebd5d06da4c427"
+            "window_size": 60,
+            "val_rmse": 12.537153716783036,
+            "run_id": "4f6aecf48c1c4f6e8968bbd6ed5e61a2",
+            "hyperparams": {
+                "d_model": 256,
+                "nhead": 8,
+                "num_layers": 4
+            }
         },
         {
             "rank": 3,
-            "filename": "model_rank3_w60.pth",
+            "filename": "model_rank3_w50.pth",
             "model_type": "Transformer",
-            "window_size": 60,
-            "test_rmse_mc_dropout": 14.329480089444594,
-            "run_id": "4f6aecf48c1c4f6e8968bbd6ed5e61a2"
+            "window_size": 50,
+            "val_rmse": 13.10719944565653,
+            "run_id": "201ea697d33f47a78c33b89afaa3ca56",
+            "hyperparams": {
+                "d_model": 64,
+                "nhead": 4,
+                "num_layers": 2
+            }
         }
     ],
     "ensemble_method": "average",

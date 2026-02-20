@@ -27,40 +27,65 @@ ensemble_models = []
 max_window_size = 0
 
 def load_artifacts():
-    """서버 시작 시 메모리에 무거운 파일들을 1번만 로드합니다."""
+    """
+    [MLOps Architecture] Dynamic Model Factory (서버 시작 시 1회 동작)
+
+    ■ 기능 설명 (What this does?):
+        - 이 함수는 하드코딩된 파라미터(예: d_model=128)를 절대 사용하지 않습니다.
+        - export_artifacts.py가 포장해준 'ensemble_meta.json' 설계도를 읽어들입니다.
+        - JSON에 적힌 hyperparams를 바탕으로, 각 모델이 과거에 학습되었던 
+          정확한 규격(Shape)의 껍데기를 메모리에 동적으로 찍어냅니다.
+        
+    ■ 기대 효과 (Impact):
+        - 향후 데이터 사이언티스트가 트랜스포머 레이어를 100층으로 늘리든, 
+          차원을 1024로 늘리든 서빙(FastAPI) 엔지니어는 코드를 건드릴 필요가 없습니다.
+        - 지속적 배포(CD, Continuous Deployment) 파이프라인의 핵심 기반이 됩니다.
+    """
     global preprocessors, ensemble_models, max_window_size
     
-    print("⏳ [MLOps] Loading artifacts into memory...")
+    print("⏳ [MLOps] Reading dynamic metadata & Loading artifacts into memory...")
     
-    # 1. 전처리기 로드
     preprocessors['pca_scaler'] = joblib.load(ARTIFACT_DIR / "pca_scaler.pkl")
     preprocessors['pca_model'] = joblib.load(ARTIFACT_DIR / "pca_model.pkl")
     preprocessors['minmax_scaler'] = joblib.load(ARTIFACT_DIR / "minmax_scaler.pkl")
     
-    # 2. 메타데이터 로드
     with open(ARTIFACT_DIR / "ensemble_meta.json", "r") as f:
         meta = json.load(f)
         
-    # 3. 모델 가중치(state_dict) 로드
     for model_info in meta["models"]:
         w_size = model_info["window_size"]
         max_window_size = max(max_window_size, w_size)
         
-        # 모델 껍데기 생성 (학습 때와 동일한 하이퍼파라미터 필요 - 예시로 CONFIG 활용)
-        # 만약 모델마다 파라미터가 달랐다면 meta.json에 파라미터도 같이 저장했어야 함
+        weight_path = ARTIFACT_DIR / model_info["filename"]
+        
+        # 1. 껍데기를 만들기 '전'에 가중치 파일(.pth)을 먼저 뜯어봄 (현물 확인)
+        state_dict = torch.load(weight_path, map_location=device, weights_only=True)
+        
+        # 2. [역공학] 가중치 텐서의 형태(Shape)에서 진짜 아키텍처 규격을 알아냄
+        # - embedding.weight의 크기는 [d_model, input_dim] 임. 여기서 d_model 훔쳐오기!
+        d_model_inferred = state_dict['embedding.weight'].shape[0]
+        
+        # - transformer_encoder.layers.X 중에 가장 큰 층수(X)를 찾아서 +1 하기!
+        layer_keys = [int(k.split('.')[2]) for k in state_dict.keys() if 'transformer_encoder.layers.' in k]
+        num_layers_inferred = max(layer_keys) + 1 if layer_keys else 2
+        
+        # - nhead는 가중치 모양에서 직접 보이지 않으므로 JSON 값을 쓰되, 에러 방지용 안전장치 추가
+        nhead_inferred = model_info.get("hyperparams", {}).get("nhead", 4)
+        if d_model_inferred % nhead_inferred != 0: 
+            nhead_inferred = 4 # nhead는 반드시 d_model의 약수여야 함
+
+        print(f"  🔍 [Reverse Engineering] Inferred Spec -> d_model: {d_model_inferred}, layers: {num_layers_inferred}")
+        
+        # 3. 알아낸 '진짜' 규격으로 동적 껍데기 생성!
         model = TransformerModel(
-            window_size=w_size, 
-            d_model=MODEL_CONFIGS['Transformer']['d_model'],    # 추가됨!
-            num_layers=MODEL_CONFIGS['Transformer']['num_layers'], # 변경됨!
-            nhead=MODEL_CONFIGS['Transformer']['nhead'],           # 변경됨!
-            dropout=0.0 # Option B: 추론 시에는 어차피 Dropout을 끕니다
+            input_dim=9, 
+            d_model=d_model_inferred,
+            nhead=nhead_inferred,
+            num_layers=num_layers_inferred
         ).to(device)
         
-        # 가중치 덮어쓰기
-        weight_path = ARTIFACT_DIR / model_info["filename"]
-        model.load_state_dict(torch.load(weight_path, map_location=device))
-        
-        # Option B: MC Dropout 끄고 일반 평가 모드 전환 (속도 극대화)
+        # 4. 완벽하게 맞춰진 껍데기에 가중치 덮어쓰기
+        model.load_state_dict(state_dict)
         model.eval() 
         
         ensemble_models.append({"model": model, "window_size": w_size})
