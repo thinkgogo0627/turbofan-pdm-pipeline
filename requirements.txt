@@ -1,27 +1,11 @@
-# Data Processing
+# 루트 폴더에서 실행
+cat <<EOF > requirements.txt
+fastapi
+uvicorn
+pydantic
+torch==2.6.0 
 pandas
 numpy
 scikit-learn
-pyarrow
-
-# Data Validation
-pandera
-
-# Modeling
-torch
-torchvision
-
-# MLOps & Tracking
-mlflow>=2.0.0
-dvc
-
-# Serving (나중에 쓸 것)
-fastapi
-uvicorn
-python-multipart
-
-# Utilities
-pyyaml
 joblib
-matplotlib
-seaborn
+EOF

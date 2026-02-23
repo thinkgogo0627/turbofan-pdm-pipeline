@@ -1,0 +1,23 @@
+# 1. 가상환경 및 캐시 (가장 무거운 놈들)
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# 2. Git 히스토리
+.git/
+.gitignore
+
+# 3. 실험 로컬 데이터 및 MLflow 무거운 로그들 
+# (우린 app/artifacts 안에 필요한 걸 다 빼뒀으니 원본은 버립니다!)
+data/
+mlruns/
+notebooks/
+*.ipynb
+
+# 4. 기타 불필요한 설정 파일
+.vscode/
+.idea/
+.env
