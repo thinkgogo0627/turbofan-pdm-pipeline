@@ -1,11 +1,9 @@
 # 루트 폴더에서 실행
-cat <<EOF > requirements.txt
 fastapi
 uvicorn
 pydantic
-torch==2.6.0 
+torch==2.6.0
 pandas
 numpy
 scikit-learn
 joblib
-EOF
